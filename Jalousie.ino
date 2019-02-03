@@ -6,8 +6,6 @@
 
 Servo myservo;
 
-volatile int servoState = HOLD_STATE;
-
 volatile boolean isButton1Pressed = false;
 volatile boolean isButton2Pressed = false;
 
@@ -16,6 +14,8 @@ int firstInterruptPin = 3;
 
 int servoPin = 9;
 
+char data;
+
 void setup() {
   pinMode(zeroInterruptPin, INPUT_PULLUP);
   pinMode(firstInterruptPin, INPUT_PULLUP);
@@ -23,33 +23,51 @@ void setup() {
   pinMode(servoPin, OUTPUT);
 
   myservo.attach(servoPin);
+  myservo.write(HOLD_STATE);
+
+  Serial.begin(9600);
 
   attachInterrupt(digitalPinToInterrupt(zeroInterruptPin), zeroInterruptCallback, FALLING);
   attachInterrupt(digitalPinToInterrupt(firstInterruptPin), firstInterruptCallback, FALLING);
 }
 
 void loop() {
-  myservo.write(servoState);
-  delay(500);
+  checkReceivedData();
+}
+
+void checkReceivedData() {
+  if (Serial.available() > 0)
+  {
+    data = Serial.read();
+    Serial.println(data);
+    if (data == '1') {
+      myservo.write(LEFT_ROTATE_STATE);
+    } else if (data == '0')  {
+      myservo.write(HOLD_STATE);
+    } else if (data == '2')  {
+      myservo.write(RIGHT_ROTATE_STATE);
+    }
+  }
 }
 
 void zeroInterruptCallback() {
   isButton1Pressed = !isButton1Pressed;
   detachInterrupt(digitalPinToInterrupt(zeroInterruptPin));
   attachInterrupt(digitalPinToInterrupt(zeroInterruptPin), zeroInterruptCallback, isButton1Pressed ? RISING : FALLING);
-  servoState = getDifferentState(LEFT_ROTATE_STATE);
+  writeDifferentState(LEFT_ROTATE_STATE, isButton1Pressed);
 }
 
 void firstInterruptCallback() {
   isButton2Pressed = !isButton2Pressed;
   detachInterrupt(digitalPinToInterrupt(firstInterruptPin));
   attachInterrupt(digitalPinToInterrupt(firstInterruptPin), firstInterruptCallback, isButton2Pressed ? RISING : FALLING);
-  servoState = getDifferentState(RIGHT_ROTATE_STATE);
+  writeDifferentState(RIGHT_ROTATE_STATE, isButton2Pressed);
 }
 
-int getDifferentState(int state) {
-  return servoState == state ? HOLD_STATE : state;
+void writeDifferentState(int state, boolean isButtonPressed) {
+  myservo.write(isButtonPressed ? state : HOLD_STATE);
 }
+
 
 
 
