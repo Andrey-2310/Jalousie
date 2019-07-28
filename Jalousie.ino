@@ -1,8 +1,12 @@
 #include <Servo.h>
+#include <iarduino_RTC.h>
 
 #define LEFT_ROTATE_STATE 0
 #define HOLD_STATE 90
 #define RIGHT_ROTATE_STATE 180
+
+#define OPEN_TIME "11:00:00"
+#define CLOSE_TIME "22:00:00"
 
 Servo myservo;
 
@@ -15,6 +19,8 @@ int firstInterruptPin = 3;
 int servoPin = 9;
 
 char data;
+
+iarduino_RTC time(RTC_DS3231);
 
 void setup() {
   pinMode(zeroInterruptPin, INPUT_PULLUP);
@@ -29,10 +35,13 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(zeroInterruptPin), zeroInterruptCallback, FALLING);
   attachInterrupt(digitalPinToInterrupt(firstInterruptPin), firstInterruptCallback, FALLING);
+
+  time.begin();
 }
 
 void loop() {
-  checkReceivedData();
+//  checkReceivedData();
+  rtcManagement();
 }
 
 void checkReceivedData() {
@@ -47,6 +56,16 @@ void checkReceivedData() {
     } else if (data == '2')  {
       myservo.write(RIGHT_ROTATE_STATE);
     }
+  }
+}
+
+void rtcManagement() {
+  String currentTime = time.gettime("H:i:s");
+  Serial.println(currentTime);
+  if (currentTime == OPEN_TIME) {
+    //TODO: move jalousie to open state with delay(1000) 
+  } else if (currentTime == CLOSE_TIME) {
+    //TODO: move jalousie to close state with delay(1000) 
   }
 }
 
