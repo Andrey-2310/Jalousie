@@ -1,5 +1,6 @@
 #include <Servo.h>
 #include <iarduino_RTC.h>
+#include "Ultrasonic.h"
 
 #define LEFT_ROTATE_STATE 0
 #define HOLD_STATE 90
@@ -7,6 +8,9 @@
 
 #define OPEN_TIME "11:00:00"
 #define CLOSE_TIME "22:00:00"
+
+#define MAX_HEIGHT 150
+#define MIN_HEIGHT 5
 
 Servo myservo;
 
@@ -18,9 +22,11 @@ int firstInterruptPin = 3;
 
 int servoPin = 9;
 
-char data;
+String data;
 
 iarduino_RTC time(RTC_DS3231);
+
+Ultrasonic ultrasonic(6, 5);
 
 void setup() {
   pinMode(zeroInterruptPin, INPUT_PULLUP);
@@ -36,36 +42,79 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(zeroInterruptPin), zeroInterruptCallback, FALLING);
   attachInterrupt(digitalPinToInterrupt(firstInterruptPin), firstInterruptCallback, FALLING);
 
-  time.begin();
+  //    time.begin();
+  //    time.settime(45,9,19,17,8,19,6);
 }
 
 void loop() {
-//  checkReceivedData();
-  rtcManagement();
+  checkReceivedData();
+  //  rtcManagement();
+}
+
+int get_distance() {
+  Serial.println(ultrasonic.read(CM));
+  return ultrasonic.read(CM);
 }
 
 void checkReceivedData() {
-  if (Serial.available() > 0)
-  {
+  if (Serial.available() > 0) {
     data = Serial.read();
     Serial.println(data);
-    if (data == '1') {
+    boolean isOkState = isCurrentStateNormal();
+    if (data == "1" && isOkState) {
       myservo.write(LEFT_ROTATE_STATE);
-    } else if (data == '0')  {
-      myservo.write(HOLD_STATE);
-    } else if (data == '2')  {
+    } else if (data == "2" && isOkState)  {
       myservo.write(RIGHT_ROTATE_STATE);
+    } else if (data == "0")  {
+      myservo.write(HOLD_STATE);
+    }  else if (data[0] == 'h') {
+      moveToState(map(data.substring(1, data.length()).toInt(), 0, 100, MIN_HEIGHT, MAX_HEIGHT));
     }
   }
+}
+
+void moveToState(int state) {
+  if (isStateInNormalRange(state)) {
+    int currentState = get_distance();
+    if (currentState > state) {
+      goDownToState(state);
+    } else {
+      goUpToState(state);
+    }
+  }
+}
+
+boolean isStateInNormalRange(int state) {
+  return state >= MIN_HEIGHT && state <= MAX_HEIGHT;
+}
+
+boolean isCurrentStateNormal() {
+  return isStateInNormalRange(get_distance());
+}
+
+void goDownToState(int state) {
+  myservo.write(LEFT_ROTATE_STATE);
+  while (get_distance() > state) {
+    delay(100);
+  }
+  myservo.write(HOLD_STATE);
+}
+
+void goUpToState(int state) {
+  myservo.write(RIGHT_ROTATE_STATE);
+  while (get_distance() < state) {
+    delay(100);
+  }
+  myservo.write(HOLD_STATE);
 }
 
 void rtcManagement() {
   String currentTime = time.gettime("H:i:s");
   Serial.println(currentTime);
   if (currentTime == OPEN_TIME) {
-    //TODO: move jalousie to open state with delay(1000) 
+    moveToState(MAX_HEIGHT);
   } else if (currentTime == CLOSE_TIME) {
-    //TODO: move jalousie to close state with delay(1000) 
+    moveToState(MIN_HEIGHT);
   }
 }
 
@@ -84,14 +133,9 @@ void firstInterruptCallback() {
 }
 
 void writeDifferentState(int state, boolean isButtonPressed) {
-  myservo.write(isButtonPressed ? state : HOLD_STATE);
+  if (isCurrentStateNormal()) {
+    myservo.write(isButtonPressed ? state : HOLD_STATE);
+  } else {
+    myservo.write(HOLD_STATE);
+  }
 }
-
-
-
-
-
-
-
-
-
